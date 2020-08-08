@@ -1,0 +1,203 @@
+//Note: Made this to mainly mess around with animations and mesh colliders. Every class should be placed inside an individual script.
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class MoveLeftX : MonoBehaviour
+{
+    public float speed;
+    private PlayerControllerX playerControllerScript;
+    private float leftBound = -10;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        playerControllerScript = GameObject.Find("Player").GetComponent<PlayerControllerX>();
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        // If game is not over, move to the left
+        if (playerControllerScript.gameOver == false)
+        {
+            transform.Translate(Vector3.left * speed * Time.deltaTime, Space.World);
+        }
+
+        // If object goes off screen that is NOT the background, destroy it
+        if (transform.position.x < leftBound && !gameObject.CompareTag("Background"))
+        {
+            Destroy(gameObject);
+        }
+
+    }
+}
+
+//New Script
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class RepeatBackgroundX : MonoBehaviour
+{
+    private Vector3 startPos;
+    private float repeatWidth;
+
+    private void Start()
+    {
+        startPos = transform.position; // Establish the default starting position 
+        repeatWidth = GetComponent<BoxCollider>().size.x / 2; // Set repeat width to half of the background
+    }
+
+    private void Update()
+    {
+        // If background moves left by its repeat width, move it back to start position
+        if (transform.position.x < startPos.x - repeatWidth)
+        {
+            transform.position = startPos;
+        }
+    }
+
+ 
+}
+
+//New Script
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class SpawnManagerX : MonoBehaviour
+{
+    public GameObject[] objectPrefabs;
+    private float spawnDelay = 2;
+    private float spawnInterval = 1.5f;
+
+    private PlayerControllerX playerControllerScript;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        InvokeRepeating("SpawnObjects", spawnDelay, spawnInterval);
+
+        playerControllerScript = GameObject.Find("Player").GetComponent<PlayerControllerX>();
+    }
+
+    // Spawn obstacles
+    void SpawnObjects ()
+    {
+        // Set random spawn location and random object index
+        Vector3 spawnLocation = new Vector3(30, Random.Range(5, 15), 0);
+        int index = Random.Range(0, objectPrefabs.Length);
+
+        // If game is still active, spawn new object
+        if (!playerControllerScript.gameOver)
+        {
+            Instantiate(objectPrefabs[index], spawnLocation, objectPrefabs[index].transform.rotation);
+        }
+
+    }
+}
+
+//New Script
+
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public class PlayerControllerX : MonoBehaviour
+{
+    public Canvas reference;
+
+    public bool gameOver;
+
+    public float floatForce;
+    public float bounceForce;
+    private float gravityModifier = 1.5f;
+    private Rigidbody playerRb;
+    private bool isLowEnough = true;
+
+    public ParticleSystem explosionParticle;
+    public ParticleSystem fireworksParticle;
+
+    private AudioSource playerAudio;
+    public AudioClip moneySound;
+    public AudioClip explodeSound;
+    public AudioClip bounceSound;
+
+    // Start is called before the first frame update
+    void Start()
+    {
+        Physics.gravity *= gravityModifier;
+        playerRb = GetComponent<Rigidbody>();
+        playerAudio = GetComponent<AudioSource>();
+
+        // Apply a small upward force at the start of the game
+        playerRb.AddForce(Vector3.up * 5, ForceMode.Impulse);
+
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        if (transform.position.y > 17)
+        {
+            isLowEnough = false;
+        }
+        else
+        {
+            isLowEnough = true;
+        }
+
+        // While space is pressed and player is low enough, float up
+        if (Input.GetKey(KeyCode.Space) && !gameOver && isLowEnough)
+        {
+            
+                playerRb.AddForce(Vector3.up * floatForce);
+            
+        }
+    }
+
+    private void OnCollisionEnter(Collision other)
+    {
+        // if player collides with bomb, explode and set gameOver to true
+        if (other.gameObject.CompareTag("Bomb"))
+        {
+            explosionParticle.Play();
+            playerAudio.PlayOneShot(explodeSound, 1.0f);
+            gameOver = true;
+            Destroy(other.gameObject);
+            StartCoroutine(wait2Stop());
+        } 
+
+        // if player collides with money, fireworks
+        else if (other.gameObject.CompareTag("Money"))
+        {
+            playerAudio.PlayOneShot(moneySound, 1.0f);
+            Destroy(other.gameObject);
+
+        }
+
+        else if (other.gameObject.CompareTag("Ground"))
+        {
+            playerAudio.PlayOneShot(bounceSound, 1.0f);
+            playerRb.AddForce(Vector3.up * bounceForce, ForceMode.Impulse);
+        }
+
+    }
+
+    IEnumerator wait2Stop()
+    {
+        yield return new WaitForSeconds(1.0f);
+        reference.gameObject.SetActive(true);
+        gameObject.SetActive(false);
+    }
+
+    public void restartGame()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+}
